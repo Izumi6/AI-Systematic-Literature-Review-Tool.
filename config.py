@@ -24,12 +24,36 @@ for _d in (DATA_DIR, OUTPUTS_DIR, PDF_CACHE_DIR, METADATA_CACHE_DIR, EMBEDDINGS_
     _d.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
-# API keys and endpoints (loaded from environment)
+# API keys and endpoints (loaded from environment or Streamlit secrets)
 # ---------------------------------------------------------------------------
-API_KEY: str = os.getenv("API_KEY", os.getenv("OPENAI_API_KEY", ""))
-API_BASE_URL: str = os.getenv("API_BASE_URL", os.getenv("OPENAI_BASE_URL", ""))
+def _get_config_val(name: str, default: str = "") -> str:
+    val = os.getenv(name, "")
+    if val:
+        return val.strip()
+    try:
+        import sys
+        if "streamlit" in sys.modules:
+            st = sys.modules["streamlit"]
+            if hasattr(st, "runtime") and st.runtime.exists():
+                if hasattr(st, "secrets") and name in st.secrets:
+                    return str(st.secrets[name]).strip()
+    except Exception:
+        pass
+    return default
+
+API_KEY: str = (
+    _get_config_val("API_KEY")
+    or _get_config_val("GEMINI_API_KEY")
+    or _get_config_val("OPENAI_API_KEY")
+)
+API_BASE_URL: str = _get_config_val("API_BASE_URL") or _get_config_val("OPENAI_BASE_URL")
+
+# Auto-configure Gemini endpoint if Google API key detected
+if API_KEY.startswith("AIzaSy") and not API_BASE_URL:
+    API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
 OPENAI_API_KEY: str = API_KEY  # Backward compatibility alias
-SEMANTIC_SCHOLAR_API_KEY: str = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
+SEMANTIC_SCHOLAR_API_KEY: str = _get_config_val("SEMANTIC_SCHOLAR_API_KEY")
 
 # ---------------------------------------------------------------------------
 # arXiv API
@@ -62,7 +86,9 @@ SECTION_HEADERS = [
 # ---------------------------------------------------------------------------
 # LLM configuration
 # ---------------------------------------------------------------------------
-LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+LLM_MODEL = _get_config_val("LLM_MODEL") or _get_config_val("OPENAI_MODEL")
+if not LLM_MODEL:
+    LLM_MODEL = "gemini-2.5-flash" if API_KEY.startswith("AIzaSy") else "gpt-4o-mini"
 OPENAI_MODEL = LLM_MODEL  # Backward compatibility alias
 LLM_TEMPERATURE = 0.2
 LLM_MAX_TOKENS_ANALYSIS = 1500

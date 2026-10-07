@@ -305,34 +305,68 @@ def render_sidebar():
 
         st.markdown("---")
         # API configuration & status
+        active_key = (
+            st.session_state.get("runtime_key", "").strip().rstrip(".")
+            or config.API_KEY
+        )
+        st.session_state.api_key_ok = bool(active_key)
+
         if st.session_state.api_key_ok:
-            st.markdown('<span class="status-success">API key configured</span>', unsafe_allow_html=True)
+            st.markdown('<span class="status-success">API key active</span>', unsafe_allow_html=True)
+            if active_key.startswith("AIzaSy"):
+                st.caption("Provider: Google Gemini (gemini-2.5-flash)")
         else:
             st.markdown('<span class="status-pending">No API key — configure below</span>', unsafe_allow_html=True)
 
         with st.expander("API Configuration", expanded=not st.session_state.api_key_ok):
-            new_key = st.text_input("API Key", type="password", value=st.session_state.get("runtime_key", ""), key="runtime_key")
-            new_model = st.text_input("Model Name", value=st.session_state.get("llm_model", LLM_MODEL), key="runtime_model")
+            current_model_val = st.session_state.get("llm_model") or config.LLM_MODEL
+            if active_key.startswith("AIzaSy") and current_model_val in ("gpt-4o-mini", "default", "Gemini"):
+                current_model_val = "gemini-2.5-flash"
+
+            new_key = st.text_input(
+                "API Key",
+                type="password",
+                value=st.session_state.get("runtime_key", active_key),
+                key="runtime_key",
+                help="Google Gemini, OpenAI, Groq, or DeepSeek API key.",
+            )
+            new_model = st.text_input(
+                "Model Name",
+                value=current_model_val,
+                key="runtime_model",
+                help="e.g. gemini-2.5-flash, gpt-4o-mini, llama-3.3-70b-versatile",
+            )
             new_base_url = st.text_input(
                 "Base URL (optional)",
-                value=st.session_state.get("api_base_url", API_BASE_URL),
-                placeholder="e.g. https://api.openai.com/v1",
+                value=st.session_state.get("api_base_url", config.API_BASE_URL),
+                placeholder="Leave blank for auto-configuration",
                 key="runtime_base_url",
             )
 
             if st.button("Save API Settings", use_container_width=True):
-                if new_key:
-                    import config
-                    config.API_KEY = new_key
-                    config.OPENAI_API_KEY = new_key
-                    config.LLM_MODEL = new_model.strip() if new_model else "gpt-4o-mini"
+                clean_key = (new_key or "").strip().rstrip(".")
+                if clean_key:
+                    config.API_KEY = clean_key
+                    config.OPENAI_API_KEY = clean_key
+                    if clean_key.startswith("AIzaSy"):
+                        config.API_BASE_URL = new_base_url.strip() or "https://generativelanguage.googleapis.com/v1beta/openai/"
+                        config.LLM_MODEL = (
+                            new_model.strip()
+                            if new_model and new_model.lower() not in ("gpt-4o-mini", "default", "gemini")
+                            else "gemini-2.5-flash"
+                        )
+                    else:
+                        config.API_BASE_URL = new_base_url.strip()
+                        config.LLM_MODEL = new_model.strip() if new_model else "gpt-4o-mini"
+
                     config.OPENAI_MODEL = config.LLM_MODEL
-                    config.API_BASE_URL = new_base_url.strip() if new_base_url else ""
                     st.session_state.llm_model = config.LLM_MODEL
                     st.session_state.api_base_url = config.API_BASE_URL
+                    st.session_state.runtime_key = clean_key
                     import llm.openai_client as _oc
                     _oc._client = None
                     st.session_state.api_key_ok = True
+                    st.success("API settings saved.")
                     st.rerun()
 
         st.markdown("---")
@@ -593,21 +627,22 @@ def page_analysis():
     )
 
     if not already_done:
-        progress_bar = st.progress(0)
+        progress_bar = st.progress(0.0)
         status = st.empty()
-        n = len(selected_papers)
 
-        for i, paper in enumerate(selected_papers):
-            status.markdown(f"**Analyzing {i+1}/{n}: {paper['title'][:60]}...**")
-            progress_bar.progress(int((i + 1) / n * 100))
+        def on_progress(msg: str, frac: float):
+            status.markdown(f"**{msg}**")
+            progress_bar.progress(min(1.0, max(0.0, frac)))
 
-        selected_papers = analyze_papers(selected_papers)
-        # write back
-        for idx_orig, paper in zip(selected_idx, selected_papers):
-            st.session_state.papers[idx_orig] = paper
-
-        progress_bar.progress(100)
-        status.markdown("**Analysis complete.**")
+        try:
+            selected_papers = analyze_papers(selected_papers, progress=on_progress)
+            for idx_orig, paper in zip(selected_idx, selected_papers):
+                st.session_state.papers[idx_orig] = paper
+            progress_bar.progress(1.0)
+            status.markdown("**Analysis complete.**")
+        except Exception as exc:
+            st.error(f"Analysis encountered an issue: {exc}")
+            logger.error("Analysis failed: %s", exc, exc_info=True)
 
     st.markdown("---")
 

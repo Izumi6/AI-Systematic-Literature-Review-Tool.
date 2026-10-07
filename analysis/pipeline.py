@@ -181,7 +181,7 @@ def analyze_papers(
         _progress(
             progress,
             f"Analyzing paper {i+1}/{n}: {paper['title'][:50]}...",
-            0.0,
+            (i + 1) / n,
         )
 
         cache_key = f"analysis_{paper_cache_key(paper.get('arxiv_id', '') or paper['title'][:40])}"
