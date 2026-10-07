@@ -24,9 +24,11 @@ for _d in (DATA_DIR, OUTPUTS_DIR, PDF_CACHE_DIR, METADATA_CACHE_DIR, EMBEDDINGS_
     _d.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
-# API keys (loaded from environment)
+# API keys and endpoints (loaded from environment)
 # ---------------------------------------------------------------------------
-OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+API_KEY: str = os.getenv("API_KEY", os.getenv("OPENAI_API_KEY", ""))
+API_BASE_URL: str = os.getenv("API_BASE_URL", os.getenv("OPENAI_BASE_URL", ""))
+OPENAI_API_KEY: str = API_KEY  # Backward compatibility alias
 SEMANTIC_SCHOLAR_API_KEY: str = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
 
 # ---------------------------------------------------------------------------
@@ -58,9 +60,10 @@ SECTION_HEADERS = [
 ]
 
 # ---------------------------------------------------------------------------
-# LLM
+# LLM configuration
 # ---------------------------------------------------------------------------
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+OPENAI_MODEL = LLM_MODEL  # Backward compatibility alias
 LLM_TEMPERATURE = 0.2
 LLM_MAX_TOKENS_ANALYSIS = 1500
 LLM_MAX_TOKENS_SURVEY = 4000

@@ -37,7 +37,7 @@ This process can take weeks for even a moderately sized corpus. This tool automa
 - **Live paper retrieval** from arXiv with date range and category filtering
 - **Semantic Scholar integration** as a configurable secondary source
 - **PDF text extraction** with section detection (Abstract, Introduction, Methods, etc.)
-- **Structured per-paper analysis** (9 fields) using OpenAI GPT with JSON output enforcement
+- **Structured per-paper analysis** (9 fields) using LLM reasoning with JSON schema enforcement
 - **Semantic embeddings** via sentence-transformers with disk caching
 - **Automatic clustering** with optimal-k selection via Silhouette Score
 - **LLM-generated theme names** for each cluster
@@ -63,7 +63,7 @@ User Input (Streamlit UI)
    |         |        |          |          |          |
 arXiv API  S2 API  PDF DL   PDF Text   LLM Analysis  Embeddings
    |         |      |            |          |          |
-   +----+----+      pdfminer  extractor  openai_client embedder
+   +----+----+      pdfminer  extractor   llm_client   embedder
         |           .six                               |
    deduplicate                                    sentence-
         |                                        transformers
@@ -99,7 +99,7 @@ arXiv API  S2 API  PDF DL   PDF Text   LLM Analysis  Embeddings
 | Paper Retrieval | arXiv Atom API (requests) |
 | Secondary Source | Semantic Scholar REST API |
 | PDF Extraction | pdfminer.six |
-| LLM Analysis | OpenAI API (GPT-4o-mini default) |
+| LLM Analysis & Synthesis | OpenAI-compatible API (GPT-4o-mini, Groq, DeepSeek, etc.) |
 | Embeddings | sentence-transformers |
 | Clustering | scikit-learn (KMeans, Agglomerative) |
 | Data Processing | pandas, numpy |
@@ -183,7 +183,7 @@ AI Systematic Literature Review Tool/
 
 - Python 3.10 or later
 - pip
-- An OpenAI API key (required for LLM analysis and survey generation)
+- An API key (OpenAI, Groq, DeepSeek, OpenRouter, or any OpenAI-compatible API)
 
 ### Steps
 
@@ -201,7 +201,7 @@ pip install -r requirements.txt
 
 # 4. Configure environment variables
 cp .env.example .env
-# Open .env and set OPENAI_API_KEY=your_actual_key
+# Open .env and set API_KEY=your_actual_key
 ```
 
 ---
@@ -211,10 +211,11 @@ cp .env.example .env
 Open `.env` and configure:
 
 ```env
-OPENAI_API_KEY=sk-...            # Required
-OPENAI_MODEL=gpt-4o-mini         # Optional, default is gpt-4o-mini
-SEMANTIC_SCHOLAR_API_KEY=        # Optional, blank = free tier
-EMBEDDING_MODEL=all-MiniLM-L6-v2 # Optional
+API_KEY=your_api_key_here         # Required for LLM analysis & synthesis
+LLM_MODEL=gpt-4o-mini             # Optional (e.g. gpt-4o-mini, llama-3.3-70b-versatile, deepseek-chat)
+API_BASE_URL=                     # Optional custom endpoint (leave blank for standard OpenAI)
+SEMANTIC_SCHOLAR_API_KEY=         # Optional, blank = free tier
+EMBEDDING_MODEL=all-MiniLM-L6-v2  # Optional
 ```
 
 API keys are loaded via `python-dotenv` and are never hard-coded in the source.
@@ -307,7 +308,7 @@ This tool has the following known limitations, which should be disclosed when pr
 
 ## Acknowledgments
 
-- arXiv open-access repository for making research papers freely available
+- arXiv open-access repository for making research papers freely accessible
 - Semantic Scholar for the open academic graph API
 - Hugging Face for the sentence-transformers library
-- OpenAI for the GPT API used in analysis and synthesis
+- Open-source AI and LLM communities for inference APIs

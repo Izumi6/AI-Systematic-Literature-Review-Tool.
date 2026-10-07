@@ -17,7 +17,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # local modules
-from config import APP_TITLE, MAX_PAPERS_UI, DEFAULT_EMBEDDING_MODEL, OPENAI_API_KEY
+from config import (
+    APP_TITLE,
+    MAX_PAPERS_UI,
+    DEFAULT_EMBEDDING_MODEL,
+    API_KEY,
+    LLM_MODEL,
+    API_BASE_URL,
+)
 from analysis.pipeline import (
     retrieve_papers,
     process_pdfs,
@@ -249,7 +256,9 @@ def _init_state():
         "cluster_method": "kmeans",
         "embedding_model": DEFAULT_EMBEDDING_MODEL,
         "silhouette_score": 0.0,
-        "api_key_ok": bool(OPENAI_API_KEY),
+        "api_key_ok": bool(API_KEY),
+        "llm_model": LLM_MODEL,
+        "api_base_url": API_BASE_URL,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -295,24 +304,39 @@ def render_sidebar():
                 st.rerun()
 
         st.markdown("---")
-        # API key status
+        # API configuration & status
         if st.session_state.api_key_ok:
-            st.markdown('<span class="status-success">OpenAI key loaded</span>', unsafe_allow_html=True)
+            st.markdown('<span class="status-success">API key configured</span>', unsafe_allow_html=True)
         else:
-            st.markdown('<span class="status-pending">No OpenAI key — set in .env</span>', unsafe_allow_html=True)
-            new_key = st.text_input("Enter OpenAI key", type="password", key="runtime_key")
-            if new_key:
-                import openai
-                openai.api_key = new_key
-                import config
-                config.OPENAI_API_KEY = new_key
-                import llm.openai_client as _oc
-                _oc._client = None
-                st.session_state.api_key_ok = True
-                st.rerun()
+            st.markdown('<span class="status-pending">No API key — configure below</span>', unsafe_allow_html=True)
+
+        with st.expander("API Configuration", expanded=not st.session_state.api_key_ok):
+            new_key = st.text_input("API Key", type="password", value=st.session_state.get("runtime_key", ""), key="runtime_key")
+            new_model = st.text_input("Model Name", value=st.session_state.get("llm_model", LLM_MODEL), key="runtime_model")
+            new_base_url = st.text_input(
+                "Base URL (optional)",
+                value=st.session_state.get("api_base_url", API_BASE_URL),
+                placeholder="e.g. https://api.openai.com/v1",
+                key="runtime_base_url",
+            )
+
+            if st.button("Save API Settings", use_container_width=True):
+                if new_key:
+                    import config
+                    config.API_KEY = new_key
+                    config.OPENAI_API_KEY = new_key
+                    config.LLM_MODEL = new_model.strip() if new_model else "gpt-4o-mini"
+                    config.OPENAI_MODEL = config.LLM_MODEL
+                    config.API_BASE_URL = new_base_url.strip() if new_base_url else ""
+                    st.session_state.llm_model = config.LLM_MODEL
+                    st.session_state.api_base_url = config.API_BASE_URL
+                    import llm.openai_client as _oc
+                    _oc._client = None
+                    st.session_state.api_key_ok = True
+                    st.rerun()
 
         st.markdown("---")
-        st.caption("AI Systematic Literature Review Tool | Internship Project")
+        st.caption("AI Systematic Literature Review Tool | Academic Project")
 
 
 def _step_done(num: int) -> bool:
@@ -539,7 +563,7 @@ def page_papers():
                 st.error("Please select at least one paper.")
                 return
             if not st.session_state.api_key_ok:
-                st.error("OpenAI API key is required for analysis. Please enter it in the sidebar.")
+                st.error("API key is required for analysis. Please enter it in the sidebar.")
                 return
             st.session_state.step = 4
             st.rerun()
@@ -562,8 +586,9 @@ def page_analysis():
     already_done = all(p.get("analysis") for p in selected_papers)
 
     st.markdown("### Structured Paper Analysis")
+    current_model = st.session_state.get("llm_model", LLM_MODEL)
     st.markdown(
-        f"Analyzing {len(selected_papers)} papers using {st.session_state.get('openai_model', 'GPT-4o-mini')}. "
+        f"Analyzing {len(selected_papers)} papers using **{current_model}**. "
         "Each paper is analyzed for its research problem, methodology, results, and contributions."
     )
 

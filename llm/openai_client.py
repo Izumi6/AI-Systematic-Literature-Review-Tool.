@@ -1,9 +1,10 @@
 """
 llm/openai_client.py
-OpenAI API client wrapper used by all LLM-dependent modules.
+LLM API client wrapper used by all analysis and synthesis modules.
 
-Centralises model selection, error handling, retry logic, and
-token management so callers only need to supply a prompt.
+Centralises model selection, provider configuration, error handling, retry logic,
+and token management so callers only need to supply a prompt.
+Supports OpenAI, Groq, DeepSeek, OpenRouter, and any OpenAI-compatible endpoint.
 """
 
 import logging
@@ -12,7 +13,7 @@ from typing import Optional
 
 from openai import OpenAI, APIError, RateLimitError, APIConnectionError
 
-from config import OPENAI_API_KEY, OPENAI_MODEL, LLM_TEMPERATURE
+from config import API_KEY, API_BASE_URL, LLM_MODEL, LLM_TEMPERATURE
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +21,17 @@ _client: Optional[OpenAI] = None
 
 
 def get_client() -> OpenAI:
-    """Return a module-level singleton OpenAI client."""
+    """Return a module-level singleton API client."""
     global _client
     if _client is None:
-        if not OPENAI_API_KEY:
+        if not API_KEY:
             raise ValueError(
-                "OPENAI_API_KEY is not set. Please add it to your .env file."
+                "API key is not configured. Please enter your API key in the sidebar or set it in your .env file."
             )
-        _client = OpenAI(api_key=OPENAI_API_KEY)
+        kwargs = {"api_key": API_KEY}
+        if API_BASE_URL:
+            kwargs["base_url"] = API_BASE_URL
+        _client = OpenAI(**kwargs)
     return _client
 
 
@@ -45,7 +49,7 @@ def chat_completion(
     Retries on rate-limit and connection errors with exponential backoff.
     Returns None on persistent failure.
     """
-    selected_model = model or OPENAI_MODEL
+    selected_model = model or LLM_MODEL
     client = get_client()
 
     for attempt in range(retries):
@@ -71,7 +75,7 @@ def chat_completion(
             time.sleep(5)
 
         except APIError as exc:
-            logger.error("OpenAI API error: %s", exc)
+            logger.error("LLM API error: %s", exc)
             break
 
     logger.error("All %d LLM attempts failed.", retries)
