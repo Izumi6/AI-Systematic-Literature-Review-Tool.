@@ -17,6 +17,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # local modules
+import config
 from config import (
     APP_TITLE,
     MAX_PAPERS_UI,
@@ -259,6 +260,9 @@ def _init_state():
         "api_key_ok": bool(API_KEY),
         "llm_model": LLM_MODEL,
         "api_base_url": API_BASE_URL,
+        "runtime_key": API_KEY,
+        "runtime_model": LLM_MODEL,
+        "runtime_base_url": API_BASE_URL,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -311,6 +315,17 @@ def render_sidebar():
         )
         st.session_state.api_key_ok = bool(active_key)
 
+        if active_key.startswith("AIzaSy"):
+            # Auto-configure Gemini defaults
+            if st.session_state.get("runtime_model", "").lower() in ("gpt-4o-mini", "default", "gemini", ""):
+                st.session_state.runtime_model = "gemini-2.5-flash"
+                st.session_state.llm_model = "gemini-2.5-flash"
+                config.LLM_MODEL = "gemini-2.5-flash"
+            if not config.API_BASE_URL:
+                config.API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+                st.session_state.api_base_url = config.API_BASE_URL
+                st.session_state.runtime_base_url = config.API_BASE_URL
+
         if st.session_state.api_key_ok:
             st.markdown('<span class="status-success">API key active</span>', unsafe_allow_html=True)
             if active_key.startswith("AIzaSy"):
@@ -319,26 +334,19 @@ def render_sidebar():
             st.markdown('<span class="status-pending">No API key — configure below</span>', unsafe_allow_html=True)
 
         with st.expander("API Configuration", expanded=not st.session_state.api_key_ok):
-            current_model_val = st.session_state.get("llm_model") or config.LLM_MODEL
-            if active_key.startswith("AIzaSy") and current_model_val in ("gpt-4o-mini", "default", "Gemini"):
-                current_model_val = "gemini-2.5-flash"
-
             new_key = st.text_input(
                 "API Key",
                 type="password",
-                value=st.session_state.get("runtime_key", active_key),
                 key="runtime_key",
                 help="Google Gemini, OpenAI, Groq, or DeepSeek API key.",
             )
             new_model = st.text_input(
                 "Model Name",
-                value=current_model_val,
                 key="runtime_model",
                 help="e.g. gemini-2.5-flash, gpt-4o-mini, llama-3.3-70b-versatile",
             )
             new_base_url = st.text_input(
                 "Base URL (optional)",
-                value=st.session_state.get("api_base_url", config.API_BASE_URL),
                 placeholder="Leave blank for auto-configuration",
                 key="runtime_base_url",
             )
@@ -363,6 +371,8 @@ def render_sidebar():
                     st.session_state.llm_model = config.LLM_MODEL
                     st.session_state.api_base_url = config.API_BASE_URL
                     st.session_state.runtime_key = clean_key
+                    st.session_state.runtime_model = config.LLM_MODEL
+                    st.session_state.runtime_base_url = config.API_BASE_URL
                     import llm.openai_client as _oc
                     _oc._client = None
                     st.session_state.api_key_ok = True
