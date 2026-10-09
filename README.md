@@ -1,5 +1,7 @@
 # AI Systematic Literature Review Tool
 
+**Live Application:** [https://ai-systematic-literature-review-tool.streamlit.app/](https://ai-systematic-literature-review-tool.streamlit.app/)
+
 An end-to-end academic literature review assistant that automatically retrieves research papers from arXiv, analyzes each paper with a large language model, clusters them by semantic theme, identifies research gaps, and generates a professionally formatted Word document literature survey.
 
 Developed as a major internship project demonstrating the practical application of NLP, LLM APIs, semantic embeddings, and automated document generation in an academic research workflow.
